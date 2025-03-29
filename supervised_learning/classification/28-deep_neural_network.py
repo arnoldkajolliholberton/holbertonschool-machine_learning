@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
-"""DeepNeuralNetwork module for classification tasks"""
+"""Deep Neural Network module for classification tasks"""
 import numpy as np
-import matplotlib.pyplot as plt
 import pickle
 
 
@@ -16,7 +15,9 @@ class DeepNeuralNetwork:
         Args:
             nx: number of input features
             layers: list of nodes per layer
-            activation: type of activation function ('sig' or 'tanh')
+            activation: type of activation function in hidden layers
+                        'sig' - sigmoid
+                        'tanh' - hyperbolic tangent
         """
         if not isinstance(nx, int):
             raise TypeError("nx must be an integer")
@@ -136,16 +137,19 @@ class DeepNeuralNetwork:
             A_prev = cache['A' + str(i - 1)]
             
             if i == self.__L:
-                dZ[i] = A - Y
+                dZ = A - Y
             else:
-                dA = np.matmul(self.__weights['W' + str(i + 1)].T, dZ[i + 1])
+                W_next = self.__weights['W' + str(i + 1)]
+                dZ_next = dZ
+                dA = np.matmul(W_next.T, dZ_next)
+                
                 if self.__activation == 'sig':
-                    dZ[i] = dA * (A * (1 - A))
+                    dZ = dA * (A * (1 - A))
                 else:  # 'tanh'
-                    dZ[i] = dA * (1 - np.square(A))
+                    dZ = dA * (1 - np.power(A, 2))
             
-            dW = 1 / m * np.matmul(dZ[i], A_prev.T)
-            db = 1 / m * np.sum(dZ[i], axis=1, keepdims=True)
+            dW = 1 / m * np.matmul(dZ, A_prev.T)
+            db = 1 / m * np.sum(dZ, axis=1, keepdims=True)
             
             self.__weights['W' + str(i)] = self.__weights['W' + str(i)] - alpha * dW
             self.__weights['b' + str(i)] = self.__weights['b' + str(i)] - alpha * db
@@ -155,8 +159,8 @@ class DeepNeuralNetwork:
         """
         Train the neural network
         Args:
-            X: input data
-            Y: correct labels
+            X: input data (nx, m)
+            Y: correct labels (classes, m)
             iterations: number of iterations
             alpha: learning rate
             verbose: print cost during training
@@ -191,7 +195,8 @@ class DeepNeuralNetwork:
             if i < iterations:
                 self.gradient_descent(Y, cache, alpha)
 
-        if graph:
+        if graph and len(costs) > 0:
+            import matplotlib.pyplot as plt
             plt.plot(np.arange(0, iterations + 1, step), costs)
             plt.xlabel('iteration')
             plt.ylabel('cost')
