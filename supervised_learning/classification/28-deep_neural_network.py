@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
-"""Deep Neural Network module for classification tasks"""
+"""DeepNeuralNetwork module for classification tasks"""
 import numpy as np
 import pickle
 
 
 class DeepNeuralNetwork:
     """
-    Deep Neural Network Class
+    Deep Neural Network Class for classification
     """
 
     def __init__(self, nx, layers, activation='sig'):
@@ -27,7 +27,7 @@ class DeepNeuralNetwork:
             raise TypeError("layers must be a list of positive integers")
         if not all(map(lambda x: isinstance(x, int) and x > 0, layers)):
             raise TypeError("layers must be a list of positive integers")
-        if activation not in ['sig', 'tanh']:
+        if activation != 'sig' and activation != 'tanh':
             raise ValueError("activation must be 'sig' or 'tanh'")
 
         self.__L = len(layers)
@@ -81,10 +81,10 @@ class DeepNeuralNetwork:
             A_prev = self.__cache['A' + str(i - 1)]
             Z = np.matmul(W, A_prev) + b
 
-            # Apply activation function
-            if i == self.__L:  # Output layer always uses sigmoid
+            # For the output layer (layer L), always use sigmoid
+            if i == self.__L:
                 A = 1 / (1 + np.exp(-Z))
-            else:  # Hidden layers use the specified activation
+            else:  # For hidden layers, use the specified activation
                 if self.__activation == 'sig':
                     A = 1 / (1 + np.exp(-Z))
                 else:  # 'tanh'
@@ -130,7 +130,7 @@ class DeepNeuralNetwork:
             alpha: learning rate
         """
         m = Y.shape[1]
-        dZ = {}
+        weights = self.__weights.copy()
         
         for i in range(self.__L, 0, -1):
             A = cache['A' + str(i)]
@@ -139,20 +139,20 @@ class DeepNeuralNetwork:
             if i == self.__L:
                 dZ = A - Y
             else:
-                W_next = self.__weights['W' + str(i + 1)]
+                W_next = weights['W' + str(i + 1)]
                 dZ_next = dZ
                 dA = np.matmul(W_next.T, dZ_next)
                 
                 if self.__activation == 'sig':
                     dZ = dA * (A * (1 - A))
                 else:  # 'tanh'
-                    dZ = dA * (1 - np.power(A, 2))
+                    dZ = dA * (1 - A**2)
             
             dW = 1 / m * np.matmul(dZ, A_prev.T)
             db = 1 / m * np.sum(dZ, axis=1, keepdims=True)
             
-            self.__weights['W' + str(i)] = self.__weights['W' + str(i)] - alpha * dW
-            self.__weights['b' + str(i)] = self.__weights['b' + str(i)] - alpha * db
+            self.__weights['W' + str(i)] = weights['W' + str(i)] - alpha * dW
+            self.__weights['b' + str(i)] = weights['b' + str(i)] - alpha * db
 
     def train(self, X, Y, iterations=5000, alpha=0.05, verbose=True,
               graph=True, step=100):
@@ -195,7 +195,7 @@ class DeepNeuralNetwork:
             if i < iterations:
                 self.gradient_descent(Y, cache, alpha)
 
-        if graph and len(costs) > 0:
+        if graph:
             import matplotlib.pyplot as plt
             plt.plot(np.arange(0, iterations + 1, step), costs)
             plt.xlabel('iteration')
