@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""DeepNeuralNetwork module for classification tasks"""
+"""Deep Neural Network module for classification tasks"""
 import numpy as np
 import pickle
 
@@ -37,12 +37,15 @@ class DeepNeuralNetwork:
 
         for i in range(self.__L):
             if i == 0:
-                self.__weights['W' + str(i + 1)] = (
-                    np.random.randn(layers[i], nx) * np.sqrt(2 / nx))
+                # Input to first hidden layer
+                self.__weights['W' + str(i + 1)] = np.random.randn(
+                    layers[i], nx) * np.sqrt(2 / nx)
             else:
-                self.__weights['W' + str(i + 1)] = (
-                    np.random.randn(layers[i], layers[i - 1]) *
-                    np.sqrt(2 / layers[i - 1]))
+                # Layer to layer
+                self.__weights['W' + str(i + 1)] = np.random.randn(
+                    layers[i], layers[i - 1]) * np.sqrt(2 / layers[i - 1])
+            
+            # Initialize biases to zeros
             self.__weights['b' + str(i + 1)] = np.zeros((layers[i], 1))
 
     @property
@@ -73,25 +76,34 @@ class DeepNeuralNetwork:
         Returns:
             Output of neural network and cache
         """
+        # Store the input in the cache
         self.__cache['A0'] = X
 
+        # Forward propagation through each layer
         for i in range(1, self.__L + 1):
+            # Get weights and biases for current layer
             W = self.__weights['W' + str(i)]
             b = self.__weights['b' + str(i)]
+            
+            # Get activation from previous layer
             A_prev = self.__cache['A' + str(i - 1)]
+            
+            # Calculate Z (pre-activation)
             Z = np.matmul(W, A_prev) + b
-
-            # For the output layer (layer L), always use sigmoid
-            if i == self.__L:
+            
+            # Apply activation function
+            if i == self.__L:  # Output layer always uses sigmoid
                 A = 1 / (1 + np.exp(-Z))
-            else:  # For hidden layers, use the specified activation
+            else:  # Hidden layers use the specified activation
                 if self.__activation == 'sig':
                     A = 1 / (1 + np.exp(-Z))
-                else:  # 'tanh'
+                else:  # self.__activation == 'tanh'
                     A = np.tanh(Z)
-
+            
+            # Store current activation in cache
             self.__cache['A' + str(i)] = A
 
+        # Return final activation and cache
         return self.__cache['A' + str(self.__L)], self.__cache
 
     def cost(self, Y, A):
@@ -104,6 +116,7 @@ class DeepNeuralNetwork:
             Cost
         """
         m = Y.shape[1]
+        # Binary cross-entropy cost function
         cost = -1 / m * np.sum(Y * np.log(A) + (1 - Y) * np.log(1.0000001 - A))
         return cost
 
@@ -116,9 +129,15 @@ class DeepNeuralNetwork:
         Returns:
             Prediction and cost
         """
+        # Forward propagation
         A, _ = self.forward_prop(X)
+        
+        # Calculate cost
         cost = self.cost(Y, A)
+        
+        # Generate predictions (binary classification)
         prediction = np.where(A >= 0.5, 1, 0)
+        
         return prediction, cost
 
     def gradient_descent(self, Y, cache, alpha=0.05):
@@ -130,29 +149,43 @@ class DeepNeuralNetwork:
             alpha: learning rate
         """
         m = Y.shape[1]
-        weights = self.__weights.copy()
         
+        # Store original weights
+        weights_copy = self.__weights.copy()
+        
+        # Backpropagation
         for i in range(self.__L, 0, -1):
+            # Get activations
             A = cache['A' + str(i)]
             A_prev = cache['A' + str(i - 1)]
             
+            # Calculate gradients
             if i == self.__L:
+                # For output layer, derivative of cost w.r.t. final activation
                 dZ = A - Y
             else:
-                W_next = weights['W' + str(i + 1)]
+                # For hidden layers, use the appropriate derivative based on activation
+                W_next = weights_copy['W' + str(i + 1)]
                 dZ_next = dZ
+                
+                # Backpropagate the error
                 dA = np.matmul(W_next.T, dZ_next)
                 
+                # Apply derivative of activation function
                 if self.__activation == 'sig':
+                    # Derivative of sigmoid
                     dZ = dA * (A * (1 - A))
-                else:  # 'tanh'
-                    dZ = dA * (1 - A**2)
+                else:  # self.__activation == 'tanh'
+                    # Derivative of tanh
+                    dZ = dA * (1 - np.power(A, 2))
             
+            # Calculate gradients for weights and biases
             dW = 1 / m * np.matmul(dZ, A_prev.T)
             db = 1 / m * np.sum(dZ, axis=1, keepdims=True)
             
-            self.__weights['W' + str(i)] = weights['W' + str(i)] - alpha * dW
-            self.__weights['b' + str(i)] = weights['b' + str(i)] - alpha * db
+            # Update weights and biases
+            self.__weights['W' + str(i)] = weights_copy['W' + str(i)] - alpha * dW
+            self.__weights['b' + str(i)] = weights_copy['b' + str(i)] - alpha * db
 
     def train(self, X, Y, iterations=5000, alpha=0.05, verbose=True,
               graph=True, step=100):
@@ -185,16 +218,21 @@ class DeepNeuralNetwork:
 
         costs = []
         for i in range(iterations + 1):
+            # Forward pass
             A, cache = self.forward_prop(X)
             
+            # Print verbose output if needed
             if verbose and i % step == 0:
                 cost = self.cost(Y, A)
                 print("Cost after {} iterations: {}".format(i, cost))
                 costs.append(cost)
-                
+            
+            # Skip gradient descent on the last iteration
             if i < iterations:
+                # Backward pass
                 self.gradient_descent(Y, cache, alpha)
 
+        # Plot learning curve if needed
         if graph:
             import matplotlib.pyplot as plt
             plt.plot(np.arange(0, iterations + 1, step), costs)
@@ -203,6 +241,7 @@ class DeepNeuralNetwork:
             plt.title('Training Cost')
             plt.show()
 
+        # Return evaluation of training data
         return self.evaluate(X, Y)
 
     def save(self, filename):
