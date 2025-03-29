@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Deep Neural Network module for binary classification"""
+"""DeepNeuralNetwork module for classification tasks"""
 import numpy as np
 import matplotlib.pyplot as plt
 import pickle
@@ -58,7 +58,7 @@ class DeepNeuralNetwork:
     def weights(self):
         """Getter for weights"""
         return self.__weights
-
+        
     @property
     def activation(self):
         """Getter for activation function type"""
@@ -68,20 +68,20 @@ class DeepNeuralNetwork:
         """
         Forward propagation
         Args:
-            X: input data
+            X: input data (nx, m)
         Returns:
             Output of neural network and cache
         """
         self.__cache['A0'] = X
 
-        for i in range(self.__L):
-            W = self.__weights['W' + str(i + 1)]
-            b = self.__weights['b' + str(i + 1)]
-            A_prev = self.__cache['A' + str(i)]
+        for i in range(1, self.__L + 1):
+            W = self.__weights['W' + str(i)]
+            b = self.__weights['b' + str(i)]
+            A_prev = self.__cache['A' + str(i - 1)]
             Z = np.matmul(W, A_prev) + b
 
             # Apply activation function
-            if i == self.__L - 1:  # Output layer always uses sigmoid
+            if i == self.__L:  # Output layer always uses sigmoid
                 A = 1 / (1 + np.exp(-Z))
             else:  # Hidden layers use the specified activation
                 if self.__activation == 'sig':
@@ -89,7 +89,7 @@ class DeepNeuralNetwork:
                 else:  # 'tanh'
                     A = np.tanh(Z)
 
-            self.__cache['A' + str(i + 1)] = A
+            self.__cache['A' + str(i)] = A
 
         return self.__cache['A' + str(self.__L)], self.__cache
 
@@ -97,8 +97,8 @@ class DeepNeuralNetwork:
         """
         Calculate cost function
         Args:
-            Y: correct labels
-            A: activated output
+            Y: correct labels (classes, m)
+            A: activated output (classes, m)
         Returns:
             Cost
         """
@@ -110,8 +110,8 @@ class DeepNeuralNetwork:
         """
         Evaluate the neural network
         Args:
-            X: input data
-            Y: correct labels
+            X: input data (nx, m)
+            Y: correct labels (classes, m)
         Returns:
             Prediction and cost
         """
@@ -124,34 +124,31 @@ class DeepNeuralNetwork:
         """
         Perform gradient descent
         Args:
-            Y: correct labels
+            Y: correct labels (classes, m)
             cache: activation results
             alpha: learning rate
         """
         m = Y.shape[1]
-        weights = self.__weights.copy()
-
+        dZ = {}
+        
         for i in range(self.__L, 0, -1):
             A = cache['A' + str(i)]
             A_prev = cache['A' + str(i - 1)]
-
-            if i == self.__L:
-                dZ = A - Y
-            else:
-                if self.__activation == 'sig':
-                    dZ = dA * A * (1 - A)
-                else:  # 'tanh'
-                    dZ = dA * (1 - A ** 2)
-
-            dW = 1 / m * np.matmul(dZ, A_prev.T)
-            db = 1 / m * np.sum(dZ, axis=1, keepdims=True)
             
-            if i > 1:
-                W = weights['W' + str(i)]
-                dA = np.matmul(W.T, dZ)
-
-            self.__weights['W' + str(i)] = weights['W' + str(i)] - alpha * dW
-            self.__weights['b' + str(i)] = weights['b' + str(i)] - alpha * db
+            if i == self.__L:
+                dZ[i] = A - Y
+            else:
+                dA = np.matmul(self.__weights['W' + str(i + 1)].T, dZ[i + 1])
+                if self.__activation == 'sig':
+                    dZ[i] = dA * (A * (1 - A))
+                else:  # 'tanh'
+                    dZ[i] = dA * (1 - np.square(A))
+            
+            dW = 1 / m * np.matmul(dZ[i], A_prev.T)
+            db = 1 / m * np.sum(dZ[i], axis=1, keepdims=True)
+            
+            self.__weights['W' + str(i)] = self.__weights['W' + str(i)] - alpha * dW
+            self.__weights['b' + str(i)] = self.__weights['b' + str(i)] - alpha * db
 
     def train(self, X, Y, iterations=5000, alpha=0.05, verbose=True,
               graph=True, step=100):
@@ -185,12 +182,14 @@ class DeepNeuralNetwork:
         costs = []
         for i in range(iterations + 1):
             A, cache = self.forward_prop(X)
-            self.gradient_descent(Y, cache, alpha)
-
+            
             if verbose and i % step == 0:
                 cost = self.cost(Y, A)
                 print("Cost after {} iterations: {}".format(i, cost))
                 costs.append(cost)
+                
+            if i < iterations:
+                self.gradient_descent(Y, cache, alpha)
 
         if graph:
             plt.plot(np.arange(0, iterations + 1, step), costs)
